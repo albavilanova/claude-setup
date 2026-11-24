@@ -1,0 +1,3 @@
+__pycache__/
+configurations/config.json
+configurations/last_build_config.json

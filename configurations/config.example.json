@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "~/software": ["project-1", "project-2"],
+    "~/work": ["project-3"]
+  },
+  "order": ["project-2", "project-3", "project-1"]
+}
