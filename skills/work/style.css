@@ -113,9 +113,217 @@ input:focus-visible {
 }
 
 .strip .gen {
-  margin-left: auto;
   font-size: 13px;
   opacity: .85;
+}
+
+/* Search: the button in the strip, and its popup with the results or one item and its links */
+
+.searchbtn,
+.sbtn {
+  font: 600 14px var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 14px;
+  min-height: 36px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.searchbtn {
+  margin-left: auto;
+}
+
+.searchbtn:focus-visible,
+.sbtn:focus-visible,
+.sopen:focus-visible,
+.sfeat:focus-visible {
+  outline: 3px solid var(--hot);
+  outline-offset: 2px;
+}
+
+dialog.search {
+  width: min(960px, 94vw);
+  max-height: 86vh;
+  padding: 16px;
+  color: var(--ink);
+  background: var(--zone);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+dialog.search::backdrop {
+  background: rgba(1,4,9,.75);
+}
+
+.shead {
+  display: flex;
+  gap: 8px;
+}
+
+.spick {
+  font: 15px var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+  min-height: 40px;
+}
+
+.spick:focus-visible {
+  outline: 3px solid var(--hot);
+  outline-offset: 2px;
+}
+
+.sq {
+  flex: 1;
+  font: 15px var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  min-height: 40px;
+}
+
+.shint,
+.scount,
+.smeta {
+  color: var(--mut);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.slist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.slist li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  margin: 2px 0;
+}
+
+.sopen {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1 1 420px;
+  text-align: left;
+  font: 14px var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.sopen {
+  flex-wrap: wrap;
+}
+
+.sfline {
+  flex-basis: 100%;
+  color: var(--mut);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sopen:hover {
+  border-color: var(--blue);
+}
+
+.sopen .num {
+  color: var(--blue);
+}
+
+.sproj {
+  font: 12px var(--mono);
+  color: var(--mut);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 5px;
+  white-space: nowrap;
+}
+
+.stext {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snote {
+  color: var(--mut);
+  font-size: 12px;
+  padding-left: 8px;
+}
+
+.snote.free {
+  color: var(--green);
+}
+
+.gone {
+  color: var(--mut);
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
+.sacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.stitle {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 12px 0 6px;
+}
+
+.sid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.sid .smeta {
+  margin: 0;
+}
+
+.sfull {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+.sgroup {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--mut);
+  margin: 18px 0 4px;
+}
+
+.sfeat {
+  color: var(--blue);
 }
 
 /* Project title, path and figures */

@@ -43,6 +43,7 @@
 - Don't define functions inside functions (nested functions or closures). Use module-level functions or methods instead.
 - Don't create empty functions or very short functions (maximum 5 lines) that are only called from one place unless necessary.
 - Don't define module-level variables (constants) that are only used in one function. Define them inside that function instead.
+- Never reference steps (SN) or decisions (DN) in code comments or docstrings: the comment says the reason itself.
 
 ## Agents and automation
 - Don't spawn subagents or run large parallel/multi-step tasks unless I ask.
@@ -106,6 +107,7 @@ All three tables: rows are numbered in order with a prefix (D, R, S), and number
 - Columns: #, Added, Status date, Step, Status, Commit.
 - Added is the date the step entered the table. Status date is the date of its current status.
 - Status: Done or Not started. What comes next goes in "Where we are", and what a step is waiting on goes in the "Open" list. A step that will not be done keeps its row, its text starting "Dropped ([DN](DECISIONS.md#decision-N)): ".
+- When a step can only start after other steps, its Step text ends with `**After:**` and those steps, a step of another project with that project's name: `**After:** S12, project-3 S63`. What a step blocks is not written: the Work status page finds it from the other steps' markers. In a step without the marker, the page guesses from the wording ("after", "waits on", "needs", "before").
 - Commit: the short hash (or hashes) of the commit that holds the step. Empty while the step is Not started, and "Not found" when it is Done but no commit could be found.
 
 ### When I say "wrapup"

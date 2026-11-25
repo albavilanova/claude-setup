@@ -118,10 +118,9 @@ def parse_wip(path):
     features = [f for f in features if not f["all_dropped"]]
 
     for feature in features:
-        cited = set()
         rng = re.search(r"\[D(\d+)\]\(DECISIONS\.md#decision-\d+\)\s*[–-]\s*\[D(\d+)\]", feature["title"])
-        if rng:
-            cited.update(range(int(rng.group(1)), int(rng.group(2)) + 1))
+        feature["range"] = set(range(int(rng.group(1)), int(rng.group(2)) + 1)) if rng else set()
+        cited = set(feature["range"])
 
         for text in [feature["title"]] + [s["text"] for s in feature["steps"]]:
             cited.update(int(n) for n in re.findall(r"\[D(\d+)\]\((?:DECISIONS\.md)?#decision-\d+\)", text))
@@ -362,10 +361,147 @@ def project_tab(project, ctx):
     )
 
 
-def page(projects, generated):
-    """The whole HTML page: the project buttons and every project's tab, with style.css and
-    script.js (next to this file) written inline, so the page is one self-contained file. The
-    script shows one tab, feature, part and group at a time and copies answers."""
+def plain(text):
+    """A markdown cell as plain text: no anchors, link targets, bold or code marks, and <br> as a space."""
+    text = re.sub(r'<a id="[^"]*"></a>', "", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)\s]+\)", r"\1", text)
+    return re.sub(r"\s+", " ", re.sub(r"\*\*|`", "", text.replace("<br>", " "))).strip()
+
+
+def step_refs(text, slug, names):
+    """The steps a text names, as (key, start, end), the key being "<project slug>:S<n>".
+
+    "S63" is a step of the project slug; "Project-2 S63" or "my-project-2 S84" is a step of
+    the project of that name (names: lowercase name -> slug), whatever its capitals.
+    """
+    alternatives = "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+    refs = []
+
+    for m in re.finditer(rf"(?<![\w-])(?:(?i:({alternatives}))\s+)?S(\d+)\b", text):
+        project = names.get(m.group(1).lower(), slug) if m.group(1) else slug
+        refs.append((f"{project}:S{m.group(2)}", m.start(), m.end()))
+
+    return refs
+
+
+def step_links(text, slug, names):
+    """What one step's text says about other steps, as (key, kind, source) for each reference.
+
+    kind is "waits" (this step waits on that one), "blocks" (that one waits on this step) or ""
+    (connected without blocking); source is "marker" or "wording". The `**After:**` marker at the
+    end of the text lists the steps it waits on, and with a marker every other reference is only
+    connected. Without one, the kind is guessed from the words just before a reference ("after",
+    "waits on", "needs", "once"…, and "before" the other way round), carried along a list ("after
+    S80 and S81"), or from "S84, waits on it" after it.
+    """
+    marker = re.search(r"\*\*After:\*\*(.*)$", text)
+    links = [(key, "waits", "marker") for key, _, _ in step_refs(plain(marker.group(1)), slug, names)] if marker else []
+    body = plain(text[:marker.start()] if marker else text)
+    kind, end = "", 0
+
+    for key, start, stop in step_refs(body, slug, names):
+        if not (end and re.fullmatch(r"\s*(?:,|and|or|\+|&)\s*", body[end:start])):  # in a list, the kind carries on
+            word = re.search(r"(?i)\b(after|waits? (?:on|for)|needs?|once|requires?|depends? on|blocked by|before)\b"
+                             r"(?:\s+[^\s,;.()]+){0,2}?\s*\(?$", body[end:start])
+            kind = ("blocks" if word.group(1).lower() == "before" else "waits") if word else ""
+            if re.match(r"(?i),?\s*(?:waits? (?:on|for)|needs?|depends? on|is blocked by) (?:it|this)\b", body[stop:]):
+                kind = "blocks"
+        links.append((key, "" if marker else kind, "wording"))
+        end = stop
+
+    return links
+
+
+def step_index(projects, names):
+    """Every step of every project for the search, by key, with its feature, status, text, the
+    decisions it links to, the steps it waits on and blocks, and those connected without blocking."""
+    steps, edges, mentions = {}, {}, set()
+
+    for p in projects:
+        for i, f in enumerate(p["features"]):
+            feature = plain(re.sub(r"\s*\((?:branch|\[D).*\)\s*$", "", f["title"]))
+            for s in f["steps"]:
+                key = f"{p['slug']}:S{s['n']}"
+                cited = re.findall(r"\[D(\d+)\]\((?:DECISIONS\.md)?#decision-\d+\)", s["text"])
+                steps[key] = {"p": p["slug"], "n": s["n"], "status": s["status"], "text": plain(s["text"]), "feature": feature,
+                              "features": [{"name": feature, "href": f"#{p['slug']}-feature-{i + 1}", "how": ""}],
+                              "href": f"#{p['slug']}-step-{s['n']}", "decisions": [f"{p['slug']}:D{n}" for n in dict.fromkeys(cited)]}
+
+                for other, kind, source in step_links(s["text"], p["slug"], names):
+                    if other == key:
+                        continue
+                    if not kind:
+                        mentions.add(tuple(sorted((key, other))))
+                    elif edges.get((key, other) if kind == "waits" else (other, key)) != "marker":
+                        # (the step that waits, the step that blocks it): a marker wins over a guess
+                        edges[(key, other) if kind == "waits" else (other, key)] = source
+
+    for key, step in steps.items():
+        step["waits"] = [[blocker, source] for (waiter, blocker), source in edges.items() if waiter == key]
+        step["blocks"] = [[waiter, source] for (waiter, blocker), source in edges.items() if blocker == key]
+        linked = {k for k, _ in step["waits"] + step["blocks"]}
+        step["connected"] = sorted({b if a == key else a for a, b in mentions if key in (a, b)} - linked)
+
+    return steps
+
+
+def decision_features(project, n):
+    """The features decision n belongs to, as on the page, each with its name, its anchor and how:
+    its decision range holds it ("by range"), its heading links to it, or some of its steps do."""
+    link = rf"\[D{n}\]\((?:DECISIONS\.md)?#decision-{n}\)"
+    found = []
+
+    for i, f in enumerate(project["features"]):
+        how = ["by range"] if n in f["range"] else (["named in its heading"] if re.search(link, f["title"]) else [])
+        citing = [f"S{s['n']}" for s in f["steps"] if re.search(link, s["text"])]
+        if citing:
+            how.append("cited by " + ", ".join(citing))
+        if how:
+            found.append({"name": plain(re.sub(r"\s*\((?:branch|\[D).*\)\s*$", "", f["title"])),
+                          "href": f"#{project['slug']}-feature-{i + 1}", "how": "; ".join(how)})
+
+    return found
+
+
+def decision_index(projects, steps, names, shown):
+    """Every decision of every project for the search, by key, with its question and choice, and
+    what it is linked to: the steps that link to it, the steps its own row names, the features it
+    belongs to, and the decisions it updates or that update it."""
+    decisions = {}
+
+    for p in projects:
+        slug = p["slug"]
+        for d in p["decisions"]:
+            key = f"{slug}:D{d['n']}"
+            row = " ".join([d["status"], d["context"], d["question"]] + d["options"])
+            decisions[key] = {
+                "p": slug, "n": d["n"], "status": d["kind"], "date": d["date"], "question": plain(d["question"]),
+                "chosen": plain(d["chosen"]), "href": f"#{slug}-decision-{d['n']}" if d["n"] in shown[slug] else "",
+                "linked": [k for k, s in steps.items() if key in s["decisions"]],
+                "named": list(dict.fromkeys(k for k, _, _ in step_refs(plain(row), slug, names))),
+                "features": decision_features(p, d["n"]),
+                "updates": list(dict.fromkeys(f"{slug}:D{n}" for n in re.findall(r"\*\*Updates \[D(\d+)\]", row))),
+                "updated_by": list(dict.fromkeys(f"{slug}:D{n}" for n in re.findall(r"(?:\*\*Updated by|Replaced by) \[D(\d+)\]", row))),
+            }
+
+    # an update written on only one of the two rows is shown on both
+    for key, d in decisions.items():
+        for other in d["updates"]:
+            if other in decisions and key not in decisions[other]["updated_by"]:
+                decisions[other]["updated_by"].append(key)
+        for other in d["updated_by"]:
+            if other in decisions and key not in decisions[other]["updates"]:
+                decisions[other]["updates"].append(key)
+
+    return decisions
+
+
+def page(projects, generated, index):
+    """The whole HTML page: the project buttons, the search button and its popup, and every
+    project's tab, with style.css and script.js (next to this file) written inline, so the page is
+    one self-contained file. index (steps and decisions with their links) is written in as JSON
+    for the search. The script shows one tab, feature, part and group at a time, copies answers
+    and searches."""
     here = os.path.dirname(os.path.abspath(__file__))
 
     with open(os.path.join(here, "style.css"), encoding="utf-8") as f:
@@ -379,13 +515,26 @@ def page(projects, generated):
         f'</button>' for p in projects
     )
     tabs = "".join(p["html"] for p in projects)
+    data = json.dumps(index, ensure_ascii=False).replace("</", "<\\/")  # "</" cannot appear inside a script element
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Work status</title>'
         f"<style>\n{css}</style></head><body>"
         f'<header class="strip"><nav aria-label="Projects">{buttons}</nav>'
-        f'<span class="gen">Built {generated} from WIP.md and DECISIONS.md</span></header>'
-        f"<main>{tabs}</main><script>{js}</script></body></html>"
+        '<button type="button" class="searchbtn" aria-haspopup="dialog">Search</button>'
+        f'<span class="gen">Last update: {generated}</span></header>'
+        '<dialog class="search" aria-label="Search steps and decisions"><div class="shead">'
+        '<select class="spick" aria-label="Project searched"><option value="">All projects</option>'
+        + "".join(f'<option value="{p["slug"]}">{html.escape(p["name"])}</option>' for p in projects)
+        + '</select>'
+        '<input type="search" class="sq" placeholder="S87, D314, 87, or words" aria-label="Search"></div>'
+        '<p class="shint">A number finds that step or decision, and a project\'s name and a number '
+        f'({html.escape(projects[0]["name"]) if projects else "project"} S12) that one; words find the steps whose text, '
+        'and the decisions whose question, has them all.</p>'
+        '<div class="sresults"></div><div class="sitem" hidden></div></dialog>'
+        f"<main>{tabs}</main>"
+        f'<script type="application/json" id="work-index">{data}</script>'
+        f"<script>{js}</script></body></html>"
     )
 
 
@@ -507,8 +656,14 @@ def main():
         project["html"] = project_tab(project, {"dir": project["dir"], "slug": project["slug"], "slugs": slugs, "file": "WIP.md",
                                                 "name": project["name"], "ids": ids, "shown": shown, "placed": placed})
 
+    # the steps and decisions of every project with their links, for the search
+    names = {p["name"].lower(): p["slug"] for p in projects}
+    steps = step_index(projects, names)
+    index = {"projects": [{"slug": p["slug"], "name": p["name"]} for p in projects],
+             "steps": steps, "decisions": decision_index(projects, steps, names, shown)}
+
     with open(args.out, "w", encoding="utf-8") as f:
-        f.write(page(projects, datetime.now().strftime("%Y-%m-%d %H:%M")))
+        f.write(page(projects, datetime.now().strftime("%Y-%m-%d %H:%M"), index))
 
     if not args.root and isinstance(config.get("projects"), dict) and config["projects"]:
         # the config of this build, next to config.json, for setup_work.py to compare with config.json

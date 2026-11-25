@@ -74,6 +74,27 @@ The page has one tab per project listed in your `config.json` (see below). Each 
 
 Every time you run `/work`, Claude first wraps up the current chat, updating the project's `WIP.md`, `DECISIONS.md` and `MINIMAP.md`, and then builds and publishes the page.
 
+#### Search
+
+"Search", in the top bar, opens a popup to find any step or decision and see what it is linked to.
+
+![The search popup: a step with the steps it waits on and blocks, a connected step, and a decision it links to](docs/work_status_search.png)
+
+- **To find something**, type its number (`S6`, `D4`, or just `6`) or words from its text.
+  - The dropdown before the box searches one project, or all of them (the default).
+  - A project's name and a number (`project-2 S6`) finds that one step or decision, whatever the dropdown says.
+- **A step** shows:
+  - the steps it waits on, and the steps it blocks
+  - the steps connected to it without blocking
+  - the decisions it links to
+- **A decision** shows:
+  - the steps that link to it, and the steps its row names
+  - the decisions it updates, or that update it
+- **Every step and decision shows its feature** under it. A decision belongs to a feature when it is in the feature's decision range, or when one of the feature's steps links to it, as on the page.
+- **To move around**, click any step or decision to open it in the popup. "Back" goes to the previous one (or to the results), "Show on page" goes to its row, and a click outside the popup closes it.
+
+**How the page knows what blocks what.** A step that has to wait for others ends its text with `**After:**` and those steps, for example `**After:** S4, S5`. A step of another project is written with that project's name (`**After:** S4, project-3 S2`). What a step blocks is never written: the page works it out from the other steps' markers. For a step without the marker, the page guesses from its wording ("after", "waits on", "needs", "before"). Each link says which of the two it came from. The format is in "Table formats" in `templates/CLAUDE.template.md`.
+
 ### How to set it up
 
 To set up the Work status page, run:
@@ -125,4 +146,4 @@ Then start a new Claude Code session and type `/`: `work` should be listed. Run 
 | `setup_work.py` | Sets up the Work status page. |
 | `configurations/` | `config.example.json`, an example of `config.json`, which lists the projects shown on the Work status page and their order. Your own `config.json` goes next to it, with `last_build_config.json`, the config of the last page `/work` built; both are ignored by git. |
 | `skills/work/` | The `/work` skill: `SKILL.md` (what Claude does on `/work`), `build_page.py` (builds the page), and `style.css` and `script.js` (its look and behaviour, written into the page). |
-| `docs/` | The screenshot used in this README. |
+| `docs/` | The screenshots used in this README: the Work status page, and its search popup. |
