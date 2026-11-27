@@ -30,11 +30,11 @@ cd claude-setup
 A project gets the working agreement and its memory files, so that every Claude Code session there works the same way and picks up where the last one stopped:
 
 - `CLAUDE.md`: how Claude works with you in this project.
-- `WIP.md`: the features in progress and their steps.
-- `DECISIONS.md`: every decision you make, with its question and options.
+- `WIP.md`: the features in progress and their steps. The finished features move to `WIP-archive.md` at each wrapup.
+- `DECISIONS.md`: every decision you make, with its question and options. The decisions no active feature needs move to `DECISIONS-archive.md` at each wrapup.
 - `MINIMAP.md`: what the project is, its traps, your rules, and the decisions not settled.
 
-The script creates the four files from `templates/`. For each file the project already has, it asks whether to overwrite it, and if so keeps the old version as `<file>.bak` (`.bak2`, `.bak3`… if taken). It also adds the four files, and those copies, to the project's `.gitignore`, as they are your notes rather than the project's code.
+The script creates the four files from `templates/`. For each file the project already has, it asks whether to overwrite it, and if so keeps the old version as `<file>.bak` (`.bak2`, `.bak3`… if taken). It also adds the four files, `WIP-archive.md`, `DECISIONS-archive.md`, and those copies, to the project's `.gitignore`, as they are your notes rather than the project's code.
 
 ### How to set it up
 
@@ -73,6 +73,8 @@ Run `/work` in a Claude Code chat to build and open a page with the status of yo
 The page has one tab per project listed in your `config.json` (see below). Each tab shows the project's features, active or past, and the decisions to take that belong to no feature. For each feature, it shows its steps (done or not) and its decisions in four groups (to take, taken but not yet applied, applied, replaced). On a decision, "Answer" or "Change" lets you pick an option or write your own, and "Copy answer" copies a line to paste into any chat.
 
 Every time you run `/work`, Claude first wraps up the current chat, updating the project's `WIP.md`, `DECISIONS.md` and `MINIMAP.md`, and then builds and publishes the page.
+
+At each wrapup, Claude also runs `archive.py`, installed with the skill, to keep `WIP.md`, which every session reads whole, and `DECISIONS.md` short. `WIP.md` keeps the active features (a step not started or a decision to take) and the features their steps name; every other feature moves, with its "Where we are" and "Open", to `WIP-archive.md`, which is only searched. `DECISIONS.md` keeps the decisions of the features in `WIP.md` and every decision not settled (Open, Pending, Parked, Unverified); every other decision moves to `DECISIONS-archive.md`. Both move back when they are needed again. It rewrites the links to what moved, in the `.md` files of every listed project. The page reads all four files, so it shows the same either way. Run it by hand with `python3 ~/.claude/skills/work/archive.py --dry-run` to see what it would move.
 
 #### Search
 
@@ -125,7 +127,7 @@ With the `config.json` above:
 ```
 $ python3 setup_work.py
 /work skill in /home/me/.claude/skills/work
-  Installed: SKILL.md, build_page.py, style.css, script.js
+  Installed: SKILL.md, build_page.py, archive.py, style.css, script.js
 
 Tabs, in order (/home/me/software/claude-setup/configurations/config.json):
   project-2, project-3, project-1
@@ -145,5 +147,5 @@ Then start a new Claude Code session and type `/`: `work` should be listed. Run 
 | `setup_project.py` | Sets up a project. |
 | `setup_work.py` | Sets up the Work status page. |
 | `configurations/` | `config.example.json`, an example of `config.json`, which lists the projects shown on the Work status page and their order. Your own `config.json` goes next to it, with `last_build_config.json`, the config of the last page `/work` built; both are ignored by git. |
-| `skills/work/` | The `/work` skill: `SKILL.md` (what Claude does on `/work`), `build_page.py` (builds the page), and `style.css` and `script.js` (its look and behaviour, written into the page). |
+| `skills/work/` | The `/work` skill: `SKILL.md` (what Claude does on `/work`), `build_page.py` (builds the page), `archive.py` (moves the features and decisions no active feature needs to `WIP-archive.md` and `DECISIONS-archive.md`, and back), and `style.css` and `script.js` (its look and behaviour, written into the page). |
 | `docs/` | The screenshots used in this README: the Work status page, and its search popup. |

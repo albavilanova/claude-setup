@@ -6,7 +6,8 @@
 - Creates CLAUDE.md, WIP.md, DECISIONS.md and MINIMAP.md from templates/, with the project's
   name. For a file the project already has, it asks whether to overwrite it; if so,
   the old version is kept as <file>.bak (.bak2… if taken).
-- Adds those four files, and their .bak copies, to the project's .gitignore.
+- Adds those four files, WIP-archive.md and DECISIONS-archive.md (written by the /work skill's
+  archive.py), and their .bak copies, to the project's .gitignore.
 
 Asks for anything not given. Standard library only. Safe to run again. The Work status page
 (/work skill) is set up separately, with setup_work.py.
@@ -65,10 +66,10 @@ def apply_files(project, name):
 
 
 def update_gitignore(project):
-    """Add the four memory files and their .bak copies to the project's .gitignore; return the lines added."""
+    """Add the four memory files, their two archives, and their .bak copies to the project's .gitignore; return the lines added."""
     path = os.path.join(project, ".gitignore")
     lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
-    wanted = [f + suffix for suffix in ("", ".bak*") for f in ("CLAUDE.md", "MINIMAP.md", "WIP.md", "DECISIONS.md")]
+    wanted = [f + suffix for suffix in ("", ".bak*") for f in ("CLAUDE.md", "MINIMAP.md", "WIP.md", "WIP-archive.md", "DECISIONS.md", "DECISIONS-archive.md")]
     added = [f for f in wanted if f not in lines and "/" + f not in lines]
 
     if added:

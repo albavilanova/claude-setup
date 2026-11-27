@@ -13,7 +13,7 @@ project is a folder with a DECISIONS.md, the folder itself or one or two levels 
 "order" gives the order of the tabs, and must name every project of "projects".
 
 - Stops, installing nothing, if config.json is missing or a project is missing from "order".
-- Copies skills/work/ (SKILL.md, build_page.py, style.css, script.js) to ~/.claude/skills/work/.
+- Copies skills/work/ (SKILL.md, build_page.py, archive.py, style.css, script.js) to ~/.claude/skills/work/.
   An installed file that differs from this version is overwritten only if the user says so,
   after its old version is kept as <file>.bak (.bak2… if taken); an identical one is left as it is.
 - Tells the installed skill where config.json is (~/.claude/skills/work/paths.json).
@@ -70,7 +70,7 @@ def read_config(config_path):
 
 
 def install_skill(skill_dir, config_path):
-    """Copy SKILL.md, build_page.py, style.css and script.js into skill_dir, and write paths.json there.
+    """Copy SKILL.md, build_page.py, archive.py, style.css and script.js into skill_dir, and write paths.json there.
 
     An installed file that differs from this version is overwritten only if the user says so,
     after it is renamed to <file>.bak (.bak2, .bak3… if taken). Returns the lists (installed,
@@ -79,7 +79,7 @@ def install_skill(skill_dir, config_path):
     os.makedirs(skill_dir, exist_ok=True)
     installed, same, overwritten, kept = [], [], [], []
 
-    for f in ("SKILL.md", "build_page.py", "style.css", "script.js"):
+    for f in ("SKILL.md", "build_page.py", "archive.py", "style.css", "script.js"):
         source, target = os.path.join(HERE, "skills", "work", f), os.path.join(skill_dir, f)
         if os.path.exists(target):
             with open(source, "rb") as a, open(target, "rb") as b:

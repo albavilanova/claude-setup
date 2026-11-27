@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build the /work status page: one tab per project that has a DECISIONS.md.
 
-Reads WIP.md (features, steps, where we are, open, last session) and
-DECISIONS.md (every decision and its status) of each project, and writes one
-self-contained HTML file. Standard library only.
+Reads WIP.md (features and steps) and DECISIONS.md (every decision and its status) of each
+project, with WIP-archive.md and DECISIONS-archive.md, where archive.py keeps what no active
+feature needs, and writes one self-contained HTML file. Standard library only.
 
     python3 build_page.py [--root DIR ...] [--out FILE]
 
@@ -76,22 +76,23 @@ def parse_decisions(path):
     return decisions
 
 
-def parse_wip(path):
-    """Features of WIP.md (one per `##` heading, except "Last session"), with their steps and the
-    decisions they cite. The text of WIP.md (where we are, open, last session) is not read, as
-    the page does not show it."""
+def wip_features(lines):
+    """Every feature of the lines of a WIP.md (one per `##` heading, except "Last session"), with
+    its steps, the decisions it cites, the lines of its section (lines[start:end]), and whether it
+    was dropped: its heading says "dropped", or all its steps were. Steps whose text starts with
+    "Dropped" are left out. The text of a feature (where we are, open) is not read, as the page
+    does not show it."""
     features = []
     in_feature = False  # whether the step rows that follow belong to the last feature
 
-    with open(path, encoding="utf-8") as f:
-        lines = f.read().splitlines()
-
-    for line in lines:
+    for i, line in enumerate(lines):
         heading = re.match(r"^## (.*)$", line)
         if heading:
+            if in_feature:
+                features[-1]["end"] = i
             in_feature = not heading.group(1).startswith("Last session")
             if in_feature:
-                features.append({"title": heading.group(1), "steps": []})
+                features.append({"title": heading.group(1), "steps": [], "start": i, "end": len(lines)})
         elif in_feature and line.startswith('| <a id="step-'):
             cells = split_row(line) + [""] * 6
             status, commit = cells[4], cells[5]
@@ -106,28 +107,28 @@ def parse_wip(path):
                 "text": cells[3], "status": status, "commit": commit,
             })
 
-    # dropped work is not shown: a feature whose heading says "dropped", a step whose text starts with "Dropped",
-    # and a feature whose steps were all dropped
-    features = [f for f in features if not re.search(r"(?i)\bdropped\b", f["title"].split("(")[0])]
-
     for feature in features:
         had_steps = bool(feature["steps"])
         feature["steps"] = [s for s in feature["steps"] if not re.match(r"^(\*\*)?Dropped\b", s["text"])]
-        feature["all_dropped"] = had_steps and not feature["steps"]
+        feature["dropped"] = bool(re.search(r"(?i)\bdropped\b", feature["title"].split("(")[0])) or (had_steps and not feature["steps"])
 
-    features = [f for f in features if not f["all_dropped"]]
-
-    for feature in features:
-        rng = re.search(r"\[D(\d+)\]\(DECISIONS\.md#decision-\d+\)\s*[–-]\s*\[D(\d+)\]", feature["title"])
+        rng = re.search(r"\[D(\d+)\]\(DECISIONS(?:-archive)?\.md#decision-\d+\)\s*[–-]\s*\[D(\d+)\]", feature["title"])
         feature["range"] = set(range(int(rng.group(1)), int(rng.group(2)) + 1)) if rng else set()
         cited = set(feature["range"])
 
         for text in [feature["title"]] + [s["text"] for s in feature["steps"]]:
-            cited.update(int(n) for n in re.findall(r"\[D(\d+)\]\((?:DECISIONS\.md)?#decision-\d+\)", text))
+            cited.update(int(n) for n in re.findall(r"\[D(\d+)\]\((?:DECISIONS(?:-archive)?\.md)?#decision-\d+\)", text))
 
         feature["decisions"] = cited
 
     return features
+
+
+def parse_wip(path):
+    """The features of a WIP.md (or WIP-archive.md) that the page shows: dropped work is not shown,
+    neither a feature whose heading says "dropped" nor one whose steps were all dropped."""
+    with open(path, encoding="utf-8") as f:
+        return [feature for feature in wip_features(f.read().splitlines()) if not feature["dropped"]]
 
 
 def resolve_href(href, ctx):
@@ -140,7 +141,9 @@ def resolve_href(href, ctx):
     slug = ctx["slugs"].get(os.path.dirname(target))
     kind = re.match(r"^(decision|step)-(\d+)$", frag)
 
-    if not (slug and kind and os.path.basename(target) == {"decision": "DECISIONS.md", "step": "WIP.md"}[kind.group(1)]):
+    files = {"decision": ("DECISIONS.md", "DECISIONS-archive.md"), "step": ("WIP.md", "WIP-archive.md")}
+
+    if not (slug and kind and os.path.basename(target) in files[kind.group(1)]):
         return None
 
     if kind.group(1) == "decision" and int(kind.group(2)) not in ctx["shown"][slug]:
@@ -422,7 +425,7 @@ def step_index(projects, names):
             feature = plain(re.sub(r"\s*\((?:branch|\[D).*\)\s*$", "", f["title"]))
             for s in f["steps"]:
                 key = f"{p['slug']}:S{s['n']}"
-                cited = re.findall(r"\[D(\d+)\]\((?:DECISIONS\.md)?#decision-\d+\)", s["text"])
+                cited = re.findall(r"\[D(\d+)\]\((?:DECISIONS(?:-archive)?\.md)?#decision-\d+\)", s["text"])
                 steps[key] = {"p": p["slug"], "n": s["n"], "status": s["status"], "text": plain(s["text"]), "feature": feature,
                               "features": [{"name": feature, "href": f"#{p['slug']}-feature-{i + 1}", "how": ""}],
                               "href": f"#{p['slug']}-step-{s['n']}", "decisions": [f"{p['slug']}:D{n}" for n in dict.fromkeys(cited)]}
@@ -448,7 +451,7 @@ def step_index(projects, names):
 def decision_features(project, n):
     """The features decision n belongs to, as on the page, each with its name, its anchor and how:
     its decision range holds it ("by range"), its heading links to it, or some of its steps do."""
-    link = rf"\[D{n}\]\((?:DECISIONS\.md)?#decision-{n}\)"
+    link = rf"\[D{n}\]\((?:DECISIONS(?:-archive)?\.md)?#decision-{n}\)"
     found = []
 
     for i, f in enumerate(project["features"]):
@@ -629,9 +632,13 @@ def read_projects(dirs):
     projects, shown = [], {}
 
     for d in dirs:
-        wip = os.path.join(d, "WIP.md")
-        features = parse_wip(wip) if os.path.exists(wip) else []
-        decisions = parse_decisions(os.path.join(d, "DECISIONS.md"))
+        # the finished features no active feature needs are in WIP-archive.md (archive.py), shown as any other
+        features = [f for name in ("WIP.md", "WIP-archive.md") if os.path.exists(os.path.join(d, name))
+                    for f in parse_wip(os.path.join(d, name))]
+        # the decisions no active feature needs are in DECISIONS-archive.md (archive.py), shown as any other
+        archive = os.path.join(d, "DECISIONS-archive.md")
+        decisions = parse_decisions(os.path.join(d, "DECISIONS.md")) + (parse_decisions(archive) if os.path.exists(archive) else [])
+        decisions.sort(key=lambda x: x["n"], reverse=True)
         linked = set().union(*(f["decisions"] for f in features))
         unlinked = [x for x in decisions if x["kind"] == "Open" and x["n"] not in linked]
         shown[slugs[d]] = (linked & {x["n"] for x in decisions}) | {x["n"] for x in unlinked}

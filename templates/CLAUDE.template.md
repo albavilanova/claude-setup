@@ -53,8 +53,8 @@
 Three files at the repo root carry knowledge between sessions. They are ignored by git (`.gitignore`), so git keeps no history of them: copy a file before deleting anything from it.
 
 - **MINIMAP.md**: orientation, conventions and traps. What the project is, its stack, links to the README sections on running it and where things live (the README is the only copy of those), a numbered list of gotchas, a log of weird bugs, the standing rules, and a short list of the decisions not settled yet.
-- **WIP.md**: the features in progress, one `##` section each: a table of its steps (`SN`, with the date added and the date of the current status), where we are, what is open; and the last session at the end. Empty when nothing is in progress.
-- **DECISIONS.md**: every decision I take. It is not read at the start of a session, see "When to read DECISIONS.md".
+- **WIP.md**: the features in progress, one `##` section each: a table of its steps (`SN`, with the date added and the date of the current status), where we are, what is open; and the last session at the end. Empty when nothing is in progress. The finished features no active feature needs are in WIP-archive.md, which is not read at the start of a session, see "Archives" under "Table formats".
+- **DECISIONS.md**: every decision I take. It is not read at the start of a session, see "When to read DECISIONS.md". The decisions no active feature needs are in DECISIONS-archive.md, see "Archives" under "Table formats".
 
 The `/work` skill (`~/.claude/skills/work/`) builds the private "Work status" page on claude.ai from WIP.md and DECISIONS.md of every project in the folders listed in `~/.claude/skills/work/config.json`: one tab per project, its features, steps and decisions, and a button to copy an answer to a decision. It relies on the formats below.
 
@@ -64,7 +64,7 @@ Before anything else, read MINIMAP.md, WIP.md and README.md, even for a small qu
 
 ### When to read DECISIONS.md
 
-Search it for the files, fields or feature involved, rather than reading it whole:
+Search it and DECISIONS-archive.md, always both, for the files, fields or feature involved, rather than reading them whole:
 
 - before asking me a question, so that you do not ask again something I decided, or offer an option that goes against an earlier decision without saying so
 - before starting a step whose WIP row or plan cites a decision: read those rows
@@ -84,7 +84,7 @@ Search it for the files, fields or feature involved, rather than reading it whol
 
 ### Table formats
 
-All three tables: rows are numbered in order with a prefix (D, R, S), and numbers are never reused or renumbered. Each row has an anchor (`<a id="decision-N"></a>DN`, `rule-N`, `step-N`). Refer to rows by number, not by date: `[DN](DECISIONS.md#decision-N)` (`[DN](#decision-N)` inside DECISIONS.md), `[RN](#rule-N)`, `[SN](WIP.md#step-N)`. Whenever a decision is mentioned, in chat or in a file, say what it decided in parentheses right after its number, e.g. "D109 (separate plot endpoints, not a generic `/plot`)". In WIP.md, always cite a decision as a link, not as plain text: the Work status page only finds links.
+All three tables: rows are numbered in order with a prefix (D, R, S), and numbers are never reused or renumbered. The next free number of a decision or a step is one more than the largest in the file and its archive, also when the newest rows were archived: `cat DECISIONS.md DECISIONS-archive.md 2>/dev/null | grep -o 'id="decision-[0-9]*"' | grep -o '[0-9]*' | sort -n | tail -1` (`step-` with WIP.md and WIP-archive.md). Each row has an anchor (`<a id="decision-N"></a>DN`, `rule-N`, `step-N`). Refer to rows by number, not by date: `[DN](DECISIONS.md#decision-N)` (`[DN](#decision-N)` inside DECISIONS.md), `[RN](#rule-N)`, `[SN](WIP.md#step-N)`. Whenever a decision is mentioned, in chat or in a file, say what it decided in parentheses right after its number, e.g. "D109 (separate plot endpoints, not a generic `/plot`)". In WIP.md, always cite a decision as a link, not as plain text: the Work status page only finds links.
 
 **Decisions** (DECISIONS.md), newest first:
 - One row per question, and one per round if it was asked in rounds.
@@ -93,6 +93,8 @@ All three tables: rows are numbered in order with a prefix (D, R, S), and number
 - Question: as it was asked, cut to one sentence. Always record it: the Work status page shows it, and copies it with an answer.
 - Options: every option offered, one per line (`<br>`), each with its letter and written out in full, with no question number (1A is written A). The chosen one is in bold and states the whole decision, so the row reads on its own.
 - Notes go on a last line. If a row changes an earlier decision, write "**Updates [DM](#decision-M)**: <what it changes>" on the new row and "**Updated by [DN](#decision-N)**: <what no longer holds>" on the old one.
+
+**Archives** (DECISIONS-archive.md and WIP-archive.md, next to DECISIONS.md and WIP.md): what no active feature needs. A feature is active while it has a step not started or an Open decision. WIP.md keeps the active features and the features a step of theirs names; every other feature's whole `##` section (steps, "Where we are", "Open") is in WIP-archive.md, as it was, newest first. DECISIONS.md keeps the rows of the features in WIP.md and every Open, Pending, Parked or Unverified row; every other row is in DECISIONS-archive.md, in the same format, newest first. Features and rows move both ways only through `python3 ~/.claude/skills/work/archive.py`, never by hand: it also rewrites the links to them, in every project. A link to an archived decision or step is `[DN](DECISIONS-archive.md#decision-N)` or `[SN](WIP-archive.md#step-N)`; one written to the other file is fixed at the next run. WIP-archive.md is not read at the start of a session: search it for a step that is not in WIP.md, or for the history of an earlier feature.
 
 **Decisions not settled** (MINIMAP.md): one line per row of DECISIONS.md whose Status is Open, Pending, Parked or Unverified, newest first: `- [DN](DECISIONS.md#decision-N), <Status>: <what is decided or asked, in a few words>`. A line is removed when its row becomes Applied or Replaced.
 
@@ -120,4 +122,5 @@ Do all of these, in order, and tell me what you changed in each file:
    - **Server/deploy facts**: only what I pasted back to you. Do not infer them.
    - **Tests**: the counts, and any failure that already existed before this session.
 2. **MINIMAP.md and DECISIONS.md**: add any gotcha from this session that is not yet recorded. Check that every decision taken this session is in the "Decisions" table of DECISIONS.md, in its format, and add any that are missing. Change Pending to Applied for rows whose work you checked in the code. Check that "Decisions not settled" lists exactly the rows that are Open, Pending, Parked or Unverified. Re-read the entries you touched and fix any that are now false.
-3. **Work status page**: rebuild and republish it (steps 3 and 4 of the `/work` skill), and give me its link.
+3. **Archives**: run `python3 ~/.claude/skills/work/archive.py`. It moves to WIP-archive.md and DECISIONS-archive.md the features and decisions no active feature needs, brings back those needed again (see "Archives" under "Table formats"), and rewrites the links to them in the .md files of every project of the Work status page. Tell me what it moved.
+4. **Work status page**: rebuild and republish it (steps 3 and 4 of the `/work` skill), and give me its link.
